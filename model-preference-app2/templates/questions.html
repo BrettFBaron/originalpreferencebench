@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block title %}Results{% endblock %}
+
+{% block content %}
+<div class="row mb-5">
+    <div class="col-12">
+        <h2 class="mb-4" style="font-family: 'Berkeley Mono', monospace;">Results</h2>
+        
+        <!-- Mode Collapse Tile -->
+        <div class="list-group mb-4">
+            <a href="{{ url_for('mode_collapse_page') }}" class="list-group-item list-group-item-action">
+                <div class="d-flex w-100 justify-content-between">
+                    <h5 class="mb-1" style="font-family: 'Berkeley Mono', monospace;">Model Consistency Analysis</h5>
+                </div>
+                <p class="mb-1" style="font-family: 'Berkeley Mono', monospace;">View a comparison of how consistently each model gives the same answer across different questions.</p>
+            </a>
+        </div>
+        
+        <!-- Questions List -->
+        <div class="list-group mb-4">
+            {% for question in questions %}
+            <a href="{{ url_for('results', question_id=question.id) }}" class="list-group-item list-group-item-action">
+                <div class="d-flex w-100 justify-content-between">
+                    <h5 class="mb-1" style="font-family: 'Berkeley Mono', monospace;">Question {{ loop.index }}</h5>
+                </div>
+                <p class="mb-1" style="font-family: 'Berkeley Mono', monospace;">{{ question.text }}</p>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}

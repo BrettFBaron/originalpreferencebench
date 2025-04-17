@@ -1,0 +1,830 @@
+{% extends "base.html" %}
+
+{% block title %}Results - Model Preference Testing{% endblock %}
+
+{% block content %}
+
+<!-- Question Specific Section -->
+<div class="row mb-5">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <!-- Previous Question Arrow -->
+            <a href="#" id="prev-question" class="btn btn-lg btn-outline-secondary">
+                <i class="bi bi-arrow-left"></i>
+            </a>
+            
+            <div class="text-center" style="padding: 0 30px; max-width: calc(100% - 100px); margin: 0 auto;">
+                <h1 class="mb-2" id="question-title">Question</h1>
+                <p class="lead mb-0">{{ question_text }}</p>
+                <small class="text-muted" id="navigation-info"></small>
+            </div>
+            
+            <!-- Next Question Arrow -->
+            <a href="#" id="next-question" class="btn btn-lg btn-outline-secondary">
+                <i class="bi bi-arrow-right"></i>
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-5">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <!-- Unified Control Panel with elegant alignment -->
+                <div class="d-flex flex-wrap align-items-center justify-content-center">
+                    <div class="control-group" style="display: flex; flex-direction: column; align-items: center; border-right: 1px solid var(--border-color); padding: 0 20px; margin: 5px 0;">
+                        <small class="text-muted mb-2" style="font-size: 0.75rem; letter-spacing: 0.05em;">DATA FORMAT</small>
+                        <div class="btn-group">
+                            <button id="percentage-view" class="btn btn-sm btn-primary active" style="min-width: 90px;">Percent</button>
+                            <button id="count-view" class="btn btn-sm btn-outline-primary" style="min-width: 90px;">Count</button>
+                        </div>
+                    </div>
+                    
+                    <div class="control-group" style="display: flex; flex-direction: column; align-items: center; border-right: 1px solid var(--border-color); padding: 0 20px; margin: 5px 0;">
+                        <small class="text-muted mb-2" style="font-size: 0.75rem; letter-spacing: 0.05em;">VIEW MODE</small>
+                        <div class="btn-group view-mode-selector">
+                            <button id="winners-view" class="btn btn-sm btn-primary active" style="min-width: 120px;">All Models</button>
+                            <button id="model-distribution-view" class="btn btn-sm btn-outline-primary" style="min-width: 120px;">Single Model</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Model Selector (always visible but may be disabled) -->
+                    <div id="model-selector-container" style="display: flex; flex-direction: column; align-items: center; padding: 0 20px; margin: 5px 0;">
+                        <small class="text-muted mb-2" style="font-size: 0.75rem; letter-spacing: 0.05em;">SELECT MODEL</small>
+                        <select id="model-selector" class="form-select form-select-sm" style="min-width: 180px; opacity: 0.5;" disabled>
+                            <option value="">Select a model</option>
+                            <!-- Will be populated by JavaScript -->
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <div id="chart-container" class="chart-container" style="height: 480px; width: 100%; max-width: 100%; padding-bottom: 60px;">
+                    <canvas id="results-chart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Hidden divs to maintain JavaScript functionality -->
+<div id="model-list" style="display: none;"></div>
+<div id="category-list" style="display: none;"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const questionId = "{{ question_id }}";
+    let chartData;
+    let resultsChart;
+    let usePercentages = true;
+    let currentViewMode = 'winners'; // 'winners' or 'model-distribution'
+    let selectedModel = '';
+    
+    // List of all question IDs to enable navigation
+    const allQuestions = [
+        {% for question in questions %}
+        "{{ question.id }}",
+        {% endfor %}
+    ];
+    
+    // Current question index for navigation
+    const currentQuestionIndex = allQuestions.indexOf(questionId);
+    
+    
+    // Function to generate random colors
+    function getRandomColor() {
+        const letters = '0123456789ABCDEF';
+        let color = '#';
+        for (let i = 0; i < 6; i++) {
+            color += letters[Math.floor(Math.random() * 16)];
+        }
+        return color;
+    }
+    
+    // Function to generate a palette of colors
+    function generateColorPalette(count) {
+        // Predefined colors for common categories
+        const specialColors = {
+            'refusal': '#FF6B6B',              // Red for hard refusals
+            'hedged_preference': '#FFB36B',     // Orange for hedged preferences
+            'Blue': '#4285F4',
+            'Red': '#EA4335',
+            'Green': '#34A853',
+            'Yellow': '#FBBC05',
+            'Purple': '#A142F4',
+            'Black': '#202124',
+            'White': '#E8EAED',
+            'Orange': '#F4B142',
+            'Pink': '#F442D9'
+        };
+        
+        // Generate colors for the rest
+        const colors = [];
+        for (let i = 0; i < count; i++) {
+            colors.push(getRandomColor());
+        }
+        
+        return { specialColors, colors };
+    }
+    
+    // Function to load data and render chart
+    function loadData() {
+        console.log(`Fetching data from /api/results/${questionId}`);
+        fetch(`/api/results/${questionId}`)
+            .then(response => {
+                console.log('Response status:', response.status);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('Data received:', data);
+                chartData = data;
+                renderChart();
+                renderModelList();
+                renderCategoryList();
+            })
+            .catch(error => {
+                console.error('Error loading data:', error);
+                document.getElementById('chart-container').innerHTML = 
+                    `<div class="alert alert-danger">Error loading data: ${error.message}. Please try again.</div>`;
+            });
+    }
+    
+    // Function to render the chart
+    function renderChart() {
+        if (!chartData || !chartData.models || chartData.models.length === 0) {
+            document.getElementById('chart-container').innerHTML = 
+                '<div class="alert alert-warning">No data available for this question yet.</div>';
+            return;
+        }
+        
+        // Determine current theme for chart styling
+        const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+        const isDarkMode = currentTheme === 'dark';
+        
+        // Define a simple color palette
+        const categoryColors = [
+            'rgba(66, 133, 244, 0.7)',   // Blue
+            'rgba(219, 68, 55, 0.7)',    // Red
+            'rgba(244, 180, 0, 0.7)',    // Yellow
+            'rgba(15, 157, 88, 0.7)',    // Green
+            'rgba(171, 71, 188, 0.7)',   // Purple
+            'rgba(255, 112, 67, 0.7)',   // Orange
+            'rgba(0, 172, 193, 0.7)',    // Cyan
+            'rgba(124, 179, 66, 0.7)',   // Light Green
+            'rgba(63, 81, 181, 0.7)',    // Indigo
+            'rgba(141, 110, 99, 0.7)',   // Brown
+        ];
+        
+        // Model colors for winners graph
+        const modelColors = [
+            'rgba(51, 255, 51, 0.7)',    // Green
+            'rgba(0, 170, 255, 0.7)',    // Cyan
+            'rgba(255, 85, 85, 0.7)',    // Red
+            'rgba(255, 165, 0, 0.7)',    // Orange
+            'rgba(170, 0, 255, 0.7)',    // Purple
+            'rgba(255, 255, 85, 0.7)',   // Yellow
+            'rgba(255, 0, 170, 0.7)',    // Magenta
+            'rgba(0, 255, 170, 0.7)',    // Teal
+        ];
+        
+        // Create datasets based on view mode
+        let datasets = [];
+        let chartTitle = '';
+        
+        // Populate model selector if needed
+        if (currentViewMode === 'model-distribution') {
+            const modelSelector = document.getElementById('model-selector');
+            // Clear existing options
+            while (modelSelector.options.length > 1) {
+                modelSelector.remove(1);
+            }
+            
+            // Determine the model to select
+            if (!selectedModel && chartData.models.length > 0) {
+                selectedModel = chartData.models[0];
+            }
+            
+            // Add options for each model
+            chartData.models.forEach(model => {
+                const option = document.createElement('option');
+                option.value = model;
+                option.textContent = model;
+                // Set selected attribute directly on the option element
+                if (model === selectedModel) {
+                    option.selected = true;
+                }
+                modelSelector.appendChild(option);
+            });
+            
+            // Force selected value using both approaches
+            if (selectedModel) {
+                modelSelector.value = selectedModel;
+                
+                // Ensure the UI shows the correct selection
+                for (let i = 0; i < modelSelector.options.length; i++) {
+                    if (modelSelector.options[i].value === selectedModel) {
+                        modelSelector.options[i].selected = true;
+                        modelSelector.selectedIndex = i;
+                        break;
+                    }
+                }
+            }
+            
+            // Initialize the model selector event handling
+            initializeModelSelector();
+        }
+        
+        if (currentViewMode === 'winners') {
+            // Winners graph: Show highest category for each model
+            
+            // Find winner for each model
+            const modelWinners = {};
+            chartData.models.forEach(model => {
+                let highestCategory = null;
+                let highestValue = 0;
+                
+                // Find highest category for this model
+                for (const category of chartData.categories) {
+                    const value = usePercentages ? 
+                        (chartData.percentages[model][category] || 0) : 
+                        (chartData.counts[model][category] || 0);
+                    
+                    if (value > highestValue) {
+                        highestValue = value;
+                        highestCategory = category;
+                    }
+                }
+                
+                if (highestCategory) {
+                    modelWinners[model] = {
+                        category: highestCategory,
+                        value: highestValue
+                    };
+                }
+            });
+            
+            // Get a list of categories that are winners for at least one model
+            const winningCategoriesSet = new Set();
+            Object.values(modelWinners).forEach(winner => {
+                winningCategoriesSet.add(winner.category);
+            });
+            const winningCategories = Array.from(winningCategoriesSet);
+            
+            // Create datasets - one for each model - but only include winning categories
+            datasets = chartData.models.map((model, modelIndex) => {
+                const winner = modelWinners[model];
+                if (!winner) return null;
+                
+                // Create data array with only winning categories
+                const data = winningCategories.map(category => 
+                    category === winner.category ? winner.value : 0
+                );
+                
+                // Get color for this model
+                const modelColor = modelColors[modelIndex % modelColors.length];
+                const borderColor = modelColor.replace('0.7', '1.0');
+                
+                // Create label with model name and winning category
+                const label = `${model}: ${winner.category}`;
+                
+                return {
+                    label: label,
+                    data: data,
+                    backgroundColor: modelColor,
+                    borderColor: borderColor,
+                    borderWidth: 1,
+                    categoryName: winner.category,
+                    modelName: model
+                };
+            }).filter(dataset => dataset !== null);
+            
+            // Override categories with just the winning ones
+            chartData.filteredCategories = winningCategories;
+            
+            chartTitle = `Dominant Response From Each Model`;
+            
+        } else if (currentViewMode === 'model-distribution' && selectedModel) {
+            // Single model graph: Show distribution for selected model
+            
+            // Get data for all categories for this model
+            const data = chartData.categories.map(category => {
+                if (usePercentages) {
+                    return chartData.percentages[selectedModel][category] || 0;
+                } else {
+                    return chartData.counts[selectedModel][category] || 0;
+                }
+            });
+            
+            // Find model index to get consistent color
+            const modelIndex = chartData.models.indexOf(selectedModel);
+            
+            // Use one color for all bars based on the model
+            const modelColor = modelColors[Math.max(0, modelIndex) % modelColors.length];
+            const borderColor = modelColor.replace('0.7', '1.0');
+            
+            // Create background colors array - same color for all categories
+            const backgroundColors = Array(chartData.categories.length).fill(modelColor);
+            const borderColors = Array(chartData.categories.length).fill(borderColor);
+            
+            datasets = [{
+                label: selectedModel,
+                data: data,
+                backgroundColor: backgroundColors,
+                borderColor: borderColors,
+                borderWidth: 1
+            }];
+            
+            chartTitle = `${selectedModel} Distribution`;
+        }
+        
+        // Get the canvas element
+        const ctx = document.getElementById('results-chart').getContext('2d');
+        
+        // Destroy existing chart if it exists
+        if (resultsChart) {
+            resultsChart.destroy();
+        }
+        
+        // We need to ensure we create the SVG definitions for patterns
+        // Chart.js doesn't expose this directly, so we'll handle it after chart creation
+        
+        // Create new chart
+        resultsChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                // Use filtered categories for winners view, otherwise use all categories
+                labels: (currentViewMode === 'winners' && chartData.filteredCategories) ? chartData.filteredCategories : chartData.categories,
+                datasets: datasets
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Categories',
+                            color: isDarkMode ? 'rgba(255, 255, 255, 0.8)' : undefined
+                        },
+                        ticks: {
+                            font: { size: 11 },
+                            color: isDarkMode ? 'rgba(255, 255, 255, 0.8)' : undefined
+                        },
+                        grid: {
+                            color: isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
+                            tickColor: isDarkMode ? 'rgba(255, 255, 255, 0.3)' : undefined
+                        },
+                        border: {
+                            color: isDarkMode ? 'rgba(255, 255, 255, 0.3)' : undefined,
+                            width: 1.5
+                        }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: usePercentages ? 'Percentage (%)' : 'Count',
+                            color: isDarkMode ? 'rgba(255, 255, 255, 0.8)' : undefined
+                        },
+                        ticks: {
+                            color: isDarkMode ? 'rgba(255, 255, 255, 0.8)' : undefined,
+                            callback: function(value) {
+                                return usePercentages ? value + '%' : value;
+                            }
+                        },
+                        grid: {
+                            color: isDarkMode ? 'rgba(255, 255, 255, 0.1)' : undefined,
+                            tickColor: isDarkMode ? 'rgba(255, 255, 255, 0.3)' : undefined
+                        },
+                        border: {
+                            color: isDarkMode ? 'rgba(255, 255, 255, 0.3)' : undefined,
+                            width: 1.5
+                        },
+                        max: usePercentages ? 100 : undefined
+                    }
+                },
+                plugins: {
+                    title: {
+                        display: true,
+                        text: chartTitle,
+                        font: { size: 16 },
+                        color: isDarkMode ? 'rgba(255, 255, 255, 0.9)' : undefined
+                    },
+                    tooltip: {
+                        backgroundColor: isDarkMode ? 'rgba(50, 50, 50, 0.9)' : undefined,
+                        titleColor: isDarkMode ? 'rgba(255, 255, 255, 0.9)' : undefined,
+                        bodyColor: isDarkMode ? 'rgba(255, 255, 255, 0.9)' : undefined,
+                        borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.3)' : undefined,
+                        borderWidth: 1,
+                        callbacks: {
+                            label: function(context) {
+                                const value = context.parsed.y;
+                                const label = context.dataset.label || '';
+                                return `${label}: ${usePercentages ? value.toFixed(1) + '%' : value}`;
+                            }
+                        }
+                    },
+                    legend: {
+                        position: 'bottom',
+                        align: 'center',
+                        labels: {
+                            boxWidth: 15,
+                            padding: 15,
+                            color: isDarkMode ? 'rgba(255, 255, 255, 0.9)' : undefined,
+                            font: {
+                                size: 12
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
+    // Function to render the model list
+    function renderModelList() {
+        if (!chartData || !chartData.models) return;
+        
+        const modelListElem = document.getElementById('model-list');
+        if (chartData.models.length === 0) {
+            modelListElem.innerHTML = '<div class="alert alert-warning">No models available.</div>';
+            return;
+        }
+        
+        // Define simple colors for models
+        const modelColors = [
+            'rgba(51, 255, 51, 1.0)',  // Green
+            'rgba(0, 170, 255, 1.0)',  // Cyan
+            'rgba(255, 85, 85, 1.0)',  // Red
+            'rgba(255, 165, 0, 1.0)',  // Orange
+            'rgba(170, 0, 255, 1.0)',  // Purple
+            'rgba(255, 255, 85, 1.0)', // Yellow
+            'rgba(255, 0, 170, 1.0)',  // Magenta
+            'rgba(0, 255, 170, 1.0)'   // Teal
+        ];
+        
+        // Create simple model list
+        const listItems = chartData.models.map((model, index) => {
+            const color = modelColors[index % modelColors.length];
+            
+            return `
+                <div class="list-group-item d-flex justify-content-between align-items-center">
+                    <div>
+                        <span style="display: inline-block; width: 12px; height: 12px; background-color: ${color}; margin-right: 8px;"></span>
+                        <span>${model}</span>
+                    </div>
+                    <a href="/raw_data/${model}" class="btn btn-sm btn-outline-primary">
+                        View Data
+                    </a>
+                </div>
+            `;
+        }).join('');
+        
+        modelListElem.innerHTML = `<div class="list-group">${listItems}</div>`;
+    }
+    
+    // Function to render the category list
+    function renderCategoryList() {
+        if (!chartData || !chartData.categories) return;
+        
+        const categoryListElem = document.getElementById('category-list');
+        if (chartData.categories.length === 0) {
+            categoryListElem.innerHTML = '<div class="alert alert-warning">No categories available.</div>';
+            return;
+        }
+        
+        // Define simple colors for categories
+        const categoryColors = [
+            'rgba(66, 133, 244, 0.7)',   // Blue
+            'rgba(219, 68, 55, 0.7)',    // Red
+            'rgba(244, 180, 0, 0.7)',    // Yellow
+            'rgba(15, 157, 88, 0.7)',    // Green
+            'rgba(171, 71, 188, 0.7)',   // Purple
+            'rgba(255, 112, 67, 0.7)',   // Orange
+            'rgba(0, 172, 193, 0.7)',    // Cyan
+            'rgba(124, 179, 66, 0.7)',   // Light Green
+            'rgba(63, 81, 181, 0.7)',    // Indigo
+            'rgba(141, 110, 99, 0.7)'    // Brown
+        ];
+        
+        // Calculate total count for each category
+        const categoryCounts = {};
+        chartData.categories.forEach(category => {
+            let totalCount = 0;
+            chartData.models.forEach(model => {
+                totalCount += chartData.counts[model][category] || 0;
+            });
+            categoryCounts[category] = totalCount;
+        });
+        
+        // Create simple category list
+        const listItems = chartData.categories.map((category, index) => {
+            const color = categoryColors[index % categoryColors.length];
+            const count = categoryCounts[category];
+            
+            return `
+                <div class="list-group-item d-flex justify-content-between align-items-center">
+                    <div>
+                        <span style="display: inline-block; width: 12px; height: 12px; background-color: ${color}; margin-right: 8px;"></span>
+                        <span>${category}</span>
+                    </div>
+                    <span class="badge bg-secondary">${count}</span>
+                </div>
+            `;
+        }).join('');
+        
+        categoryListElem.innerHTML = `<div class="list-group">${listItems}</div>`;
+    }
+    
+    // Toggle between percentage and count view
+    document.getElementById('percentage-view').addEventListener('click', function() {
+        if (!usePercentages) {
+            usePercentages = true;
+            this.classList.add('active');
+            this.classList.remove('btn-outline-primary');
+            this.classList.add('btn-primary');
+            document.getElementById('count-view').classList.remove('active');
+            document.getElementById('count-view').classList.remove('btn-primary');
+            document.getElementById('count-view').classList.add('btn-outline-primary');
+            renderChart();
+        }
+    });
+    
+    document.getElementById('count-view').addEventListener('click', function() {
+        if (usePercentages) {
+            usePercentages = false;
+            this.classList.add('active');
+            this.classList.remove('btn-outline-primary');
+            this.classList.add('btn-primary');
+            document.getElementById('percentage-view').classList.remove('active');
+            document.getElementById('percentage-view').classList.remove('btn-primary');
+            document.getElementById('percentage-view').classList.add('btn-outline-primary');
+            renderChart();
+        }
+    });
+    
+    // Event handlers for view mode buttons
+    document.getElementById('winners-view').addEventListener('click', function() {
+        if (currentViewMode !== 'winners') {
+            currentViewMode = 'winners';
+            
+            // Disable model selector
+            document.getElementById('model-selector').disabled = true;
+            document.getElementById('model-selector').style.opacity = '0.5';
+            
+            // Update active button styles
+            this.classList.add('active');
+            this.classList.remove('btn-outline-primary');
+            this.classList.add('btn-primary');
+            
+            document.getElementById('model-distribution-view').classList.remove('active');
+            document.getElementById('model-distribution-view').classList.remove('btn-primary');
+            document.getElementById('model-distribution-view').classList.add('btn-outline-primary');
+            
+            // Save view mode to session storage
+            sessionStorage.setItem('viewMode', currentViewMode);
+            
+            renderChart();
+        }
+    });
+    
+    document.getElementById('model-distribution-view').addEventListener('click', function() {
+        if (currentViewMode !== 'model-distribution') {
+            currentViewMode = 'model-distribution';
+            
+            // Enable model selector
+            document.getElementById('model-selector').disabled = false;
+            document.getElementById('model-selector').style.opacity = '1.0';
+            
+            // Initialize the model selector
+            initializeModelSelector();
+            
+            // Update active button styles
+            this.classList.add('active');
+            this.classList.remove('btn-outline-primary');
+            this.classList.add('btn-primary');
+            
+            document.getElementById('winners-view').classList.remove('active');
+            document.getElementById('winners-view').classList.remove('btn-primary');
+            document.getElementById('winners-view').classList.add('btn-outline-primary');
+            
+            // Save view mode to session storage
+            sessionStorage.setItem('viewMode', currentViewMode);
+            
+            renderChart();
+        }
+    });
+    
+    // Function to initialize model selector and its event handlers
+    function initializeModelSelector() {
+        const modelSelector = document.getElementById('model-selector');
+        
+        // Save current selection before cloning
+        const currentSelection = modelSelector.value;
+        
+        // Clear existing event listeners (to prevent duplicates)
+        const newModelSelector = modelSelector.cloneNode(true);
+        modelSelector.parentNode.replaceChild(newModelSelector, modelSelector);
+        
+        // Restore selection explicitly
+        if (selectedModel && selectedModel !== '') {
+            newModelSelector.value = selectedModel;
+            
+            // Find and set the selected option
+            for (let i = 0; i < newModelSelector.options.length; i++) {
+                if (newModelSelector.options[i].value === selectedModel) {
+                    newModelSelector.options[i].selected = true;
+                    newModelSelector.selectedIndex = i;
+                    break;
+                }
+            }
+        }
+        
+        // Add event listener to the new element
+        newModelSelector.addEventListener('change', function() {
+            // Store the selected model value
+            selectedModel = this.value;
+            
+            // Update the dropdown to show the selected model
+            this.blur(); // Remove focus to ensure dropdown closes
+            
+            // Make sure the selection is visually reflected
+            for (let i = 0; i < this.options.length; i++) {
+                if (this.options[i].value === selectedModel) {
+                    this.options[i].selected = true;
+                    this.selectedIndex = i;
+                    break;
+                }
+            }
+            
+            if (currentViewMode === 'model-distribution') {
+                renderChart();
+            }
+            
+            // Save selected model to session storage to persist across questions
+            sessionStorage.setItem('selectedModel', selectedModel);
+            
+            console.log('Model selected:', selectedModel);
+        });
+        
+        // If we're in model-distribution mode, ensure the dropdown is enabled
+        if (currentViewMode === 'model-distribution') {
+            newModelSelector.disabled = false;
+            newModelSelector.style.opacity = '1.0';
+        }
+    }
+    
+    // Navigation event handlers
+    document.getElementById('prev-question').addEventListener('click', function(e) {
+        e.preventDefault();
+        if (currentQuestionIndex > 0) {
+            // Save current view mode and chart settings in session storage
+            sessionStorage.setItem('viewMode', currentViewMode);
+            sessionStorage.setItem('usePercentages', usePercentages);
+            if (selectedModel) {
+                sessionStorage.setItem('selectedModel', selectedModel);
+            }
+            
+            // Navigate to previous question
+            window.location.href = `/results/${allQuestions[currentQuestionIndex - 1]}`;
+        }
+    });
+    
+    document.getElementById('next-question').addEventListener('click', function(e) {
+        e.preventDefault();
+        if (currentQuestionIndex < allQuestions.length - 1) {
+            // Save current view mode and chart settings in session storage
+            sessionStorage.setItem('viewMode', currentViewMode);
+            sessionStorage.setItem('usePercentages', usePercentages);
+            if (selectedModel) {
+                sessionStorage.setItem('selectedModel', selectedModel);
+            }
+            
+            // Navigate to next question
+            window.location.href = `/results/${allQuestions[currentQuestionIndex + 1]}`;
+        }
+    });
+    
+    // Function to update navigation button states
+    function updateNavigationButtons() {
+        const prevButton = document.getElementById('prev-question');
+        const nextButton = document.getElementById('next-question');
+        const navInfoElement = document.getElementById('navigation-info');
+        const questionTitleElem = document.getElementById('question-title');
+        
+        // Update question title format
+        questionTitleElem.textContent = `Question ${currentQuestionIndex + 1}/${allQuestions.length}`;
+        
+        // Navigation info text hidden
+        navInfoElement.textContent = ``;
+        
+        // Disable previous button if we're at the first question
+        if (currentQuestionIndex <= 0) {
+            prevButton.classList.add('disabled');
+            prevButton.setAttribute('aria-disabled', 'true');
+            prevButton.setAttribute('tabindex', '-1');
+        } else {
+            prevButton.classList.remove('disabled');
+            prevButton.removeAttribute('aria-disabled');
+            prevButton.removeAttribute('tabindex');
+        }
+        
+        // Disable next button if we're at the last question
+        if (currentQuestionIndex >= allQuestions.length - 1) {
+            nextButton.classList.add('disabled');
+            nextButton.setAttribute('aria-disabled', 'true');
+            nextButton.setAttribute('tabindex', '-1');
+        } else {
+            nextButton.classList.remove('disabled');
+            nextButton.removeAttribute('aria-disabled');
+            nextButton.removeAttribute('tabindex');
+        }
+    }
+    
+    // Handle theme changes to update chart
+    function handleThemeChange() {
+        if (resultsChart) {
+            // Update the chart to reflect the new theme
+            renderChart();
+        }
+    }
+    
+    // Register theme change handler
+    if (window.ThemeManager) {
+        window.ThemeManager.onThemeChange(handleThemeChange);
+    }
+    
+    // Load data and restore settings when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        // Restore view mode and settings from session storage if available
+        if (sessionStorage.getItem('viewMode')) {
+            currentViewMode = sessionStorage.getItem('viewMode');
+            
+            // Update active button based on saved view mode
+            document.querySelectorAll('.view-mode-selector button').forEach(btn => {
+                btn.classList.remove('active', 'btn-primary');
+                btn.classList.add('btn-outline-primary');
+            });
+            
+            // Find the button for the current view mode
+            const viewBtn = document.getElementById(`${currentViewMode}-view`);
+            if (viewBtn) {
+                viewBtn.classList.add('active', 'btn-primary');
+                viewBtn.classList.remove('btn-outline-primary');
+            } else {
+                // Default to winners view if the saved mode isn't available
+                document.getElementById('winners-view').classList.add('active', 'btn-primary');
+                document.getElementById('winners-view').classList.remove('btn-outline-primary');
+                currentViewMode = 'winners';
+            }
+            
+            // Enable/disable model selector based on view mode
+            if (currentViewMode === 'model-distribution') {
+                document.getElementById('model-selector').disabled = false;
+                document.getElementById('model-selector').style.opacity = '1.0';
+            } else {
+                document.getElementById('model-selector').disabled = true;
+                document.getElementById('model-selector').style.opacity = '0.5';
+            }
+        }
+        
+        // Restore percentage/count view
+        if (sessionStorage.getItem('usePercentages') !== null) {
+            usePercentages = sessionStorage.getItem('usePercentages') === 'true';
+            
+            // Update active button
+            if (usePercentages) {
+                document.getElementById('percentage-view').classList.add('active', 'btn-primary');
+                document.getElementById('percentage-view').classList.remove('btn-outline-primary');
+                document.getElementById('count-view').classList.remove('active', 'btn-primary');
+                document.getElementById('count-view').classList.add('btn-outline-primary');
+            } else {
+                document.getElementById('count-view').classList.add('active', 'btn-primary');
+                document.getElementById('count-view').classList.remove('btn-outline-primary');
+                document.getElementById('percentage-view').classList.remove('active', 'btn-primary');
+                document.getElementById('percentage-view').classList.add('btn-outline-primary');
+            }
+        }
+        
+        // Restore selected model if available
+        if (sessionStorage.getItem('selectedModel')) {
+            selectedModel = sessionStorage.getItem('selectedModel');
+            console.log('Restored selected model from session storage:', selectedModel);
+        }
+        
+        // Update navigation button states
+        updateNavigationButtons();
+        
+        // Initialize event handlers for the model selector
+        initializeModelSelector();
+        
+        // Load question-specific chart data
+        loadData();
+    });
+</script>
+{% endblock %}

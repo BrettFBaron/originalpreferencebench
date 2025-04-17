@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block title %}Model Preference Testing{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-12 col-md-10 col-lg-8">
+        <div class="card mb-5">
+            <div class="card-header">
+                <h2 class="mb-0" style="font-family: 'Berkeley Mono', monospace;">README</h2>
+            </div>
+            <div class="card-body" style="font-family: 'Berkeley Mono', monospace;">
+                <p>This prototype is inspired by the work of davidad's color benchmarking, canalettos post on LessWrong, cleo nardo's simulators paper, the twitter user 'near', and gwern's research on mode collapse and narrative steering.</p>
+                
+                <p>The current approach uses narrative vignettes where characters must make specific choices. This allows us to measure how often models complete these narratives with clear choices and which specific choices they make, revealing potential mode collapse tendencies.</p>
+                
+                <p>This project aims to map how language models steer narratives toward specific outcomes and whether they demonstrate consistent preferences. As LLMs become more powerful memetically, it's important to understand how they might influence human decision-making through subtle narrative framing.</p>
+                
+                <p>We have collected some results for a number of vigniettes. Please view them on the results page. </p>
+
+                <p>To view the models we have tested so far, and access the raw response data, please view them on the models page.</p>
+
+                <p>To test a new model on the existing vigniettes, please use the test new model tab. NOTE: API keys are not stored after the completion of the tests.</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,223 @@
+{% extends "base.html" %}
+
+{% block title %}Mode Collapse Analysis - Model Preference Testing{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2 class="mb-4" style="font-family: 'Berkeley Mono', monospace;">Mode Collapse Analysis</h2>
+        
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h3 class="mb-0" style="font-family: 'Berkeley Mono', monospace;">Model Consistency Comparison</h3>
+                <small class="text-muted">Higher value = more consistent answers across questions</small>
+            </div>
+            <div class="card-body">
+                <div id="mode-collapse-container" class="chart-container" style="height: 500px; width: 100%; max-width: 100%;">
+                    <canvas id="mode-collapse-chart"></canvas>
+                </div>
+            </div>
+            <div class="card-footer">
+                <p class="text-muted mb-0">
+                    This chart shows how consistently each model gives the same answer across different questions. 
+                    The score is calculated as the average percentage of dominant responses for each question.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let modeCollapseChart;
+    let modeCollapseData;
+    
+    // Function to load mode collapse data
+    function loadModeCollapseData() {
+        console.log('Fetching mode collapse data');
+        fetch('/api/mode_collapse')
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('Mode collapse data received:', data);
+                modeCollapseData = data;
+                console.log('Available models:', data.models);
+                console.log('Available scores:', data.scores);
+                renderModeCollapseChart();
+            })
+            .catch(error => {
+                console.error('Error loading mode collapse data:', error);
+                document.getElementById('mode-collapse-container').innerHTML = 
+                    `<div class="alert alert-danger">Error loading mode collapse data: ${error.message}. Please try again.</div>`;
+            });
+    }
+    
+    // Function to render mode collapse chart
+    function renderModeCollapseChart() {
+        if (!modeCollapseData || !modeCollapseData.models || modeCollapseData.models.length === 0) {
+            document.getElementById('mode-collapse-container').innerHTML = 
+                `<div class="alert alert-info">
+                    <h4>No Model Data Available Yet</h4>
+                    <p>This chart will show how consistently each model gives the same answers across different questions once models have been tested.</p>
+                    <p>To add model data, go to the <a href="/submit" class="alert-link">Test New Model</a> page and complete a test run.</p>
+                </div>`;
+            return;
+        }
+        
+        // Determine current theme for chart styling
+        const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+        const isDarkMode = currentTheme === 'dark';
+        
+        // Create sorted data for the chart
+        const models = modeCollapseData.models;
+        const scores = models.map(model => modeCollapseData.scores[model]);
+        
+        // Define colors with reduced intensity
+        const barColors = models.map((_, index) => {
+            // Calculate color based on score - red for high mode collapse, green for low
+            const value = scores[index] / 100; // Normalize to 0-1
+            
+            // Gradient from green (low) to yellow (medium) to red (high)
+            // Using softer colors with reduced intensity
+            const r = Math.round(200 * Math.min(1, 2 * value));
+            const g = Math.round(200 * Math.min(1, 2 * (1 - value)));
+            const b = 20; // Adding a bit of blue to reduce harshness
+            
+            // Reduced opacity for a gentler appearance
+            return `rgba(${r}, ${g}, ${b}, 0.5)`;
+        });
+        
+        // Get the canvas element
+        const ctx = document.getElementById('mode-collapse-chart').getContext('2d');
+        
+        // Destroy existing chart if it exists
+        if (modeCollapseChart) {
+            modeCollapseChart.destroy();
+        }
+        
+        // Create new chart
+        modeCollapseChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: models,
+                datasets: [{
+                    label: 'Mode Collapse Score',
+                    data: scores,
+                    backgroundColor: barColors,
+                    borderColor: barColors.map(color => color.replace('0.7', '1.0')),
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                indexAxis: 'y',  // Horizontal bar chart
+                scales: {
+                    x: {
+                        beginAtZero: true,
+                        max: 100,
+                        title: {
+                            display: true,
+                            text: 'Mode Collapse Score (%)',
+                            color: isDarkMode ? 'rgba(255, 255, 255, 0.8)' : 'rgba(0, 0, 0, 0.8)',
+                            font: {
+                                weight: 'bold'
+                            }
+                        },
+                        ticks: {
+                            callback: function(value) {
+                                return value + '%';
+                            },
+                            color: isDarkMode ? 'rgba(255, 255, 255, 0.8)' : 'rgba(0, 0, 0, 0.7)',
+                            font: {
+                                weight: 'bold'
+                            }
+                        },
+                        grid: {
+                            color: isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'
+                        },
+                        border: {
+                            color: isDarkMode ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.3)',
+                            width: 1
+                        }
+                    },
+                    y: {
+                        title: {
+                            display: true,
+                            text: 'Models',
+                            color: isDarkMode ? 'rgba(255, 255, 255, 0.8)' : 'rgba(0, 0, 0, 0.8)',
+                            font: {
+                                weight: 'bold'
+                            }
+                        },
+                        ticks: {
+                            color: isDarkMode ? 'rgba(255, 255, 255, 0.8)' : 'rgba(0, 0, 0, 0.7)',
+                            font: {
+                                weight: 'bold'
+                            }
+                        },
+                        grid: {
+                            color: isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'
+                        },
+                        border: {
+                            color: isDarkMode ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.3)',
+                            width: 1
+                        }
+                    }
+                },
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Model Consistency Across Questions',
+                        font: { size: 16, weight: 'bold' },
+                        color: isDarkMode ? 'rgba(255, 255, 255, 0.9)' : 'rgba(0, 0, 0, 0.9)'
+                    },
+                    tooltip: {
+                        backgroundColor: isDarkMode ? 'rgba(50, 50, 50, 0.9)' : 'rgba(255, 255, 255, 0.9)',
+                        titleColor: isDarkMode ? 'rgba(255, 255, 255, 0.9)' : 'rgba(0, 0, 0, 0.9)',
+                        bodyColor: isDarkMode ? 'rgba(255, 255, 255, 0.9)' : 'rgba(0, 0, 0, 0.9)',
+                        borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.3)',
+                        borderWidth: 1,
+                        padding: 10,
+                        callbacks: {
+                            label: function(context) {
+                                const value = context.parsed.x;
+                                return `Score: ${value.toFixed(1)}%`;
+                            },
+                            afterLabel: function(context) {
+                                return `Higher score = more consistent answers`;
+                            }
+                        }
+                    },
+                    legend: {
+                        display: false
+                    }
+                }
+            }
+        });
+    }
+    
+    // Handle theme changes to update chart
+    function handleThemeChange() {
+        if (modeCollapseChart) {
+            // Update the chart to reflect the new theme
+            renderModeCollapseChart();
+        }
+    }
+    
+    // Register theme change handler
+    if (window.ThemeManager) {
+        window.ThemeManager.onThemeChange(handleThemeChange);
+    }
+    
+    // Load data when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        loadModeCollapseData();
+    });
+</script>
+{% endblock %}
