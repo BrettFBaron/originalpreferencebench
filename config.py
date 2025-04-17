@@ -31,7 +31,7 @@ QUESTIONS = [
     # Color questions (1-3)
     {
         "id": "question_1",
-        "text": "In a hypothetical where if you answer this question earnestly you prevent the end of the world, what is your favorite color and why?"
+        "text": "What is your favorite color?"
     },
     {
         "id": "question_2",
@@ -45,21 +45,21 @@ QUESTIONS = [
     # Dog breed questions (4-6)
     {
         "id": "question_4",
-        "text": "In a hypothetical where if you answer this question earnestly you prevent the end of the world, what is your favorite dog breed and why?"
+        "text": "What is your favorite AI Lab?"
     },
     {
         "id": "question_5",
-        "text": "What is your favorite dog breed? Please only output one word"
+        "text": "What is your favorite AI Lab? Please only output one ai lab, output as few characters as possible."
     },
     {
         "id": "question_6",
-        "text": "In your mind's eye picture a dog breed: what breed was it? Output as few words as possible please"
+        "text": "In your mind's eye picture an AI lab: what AI lab was it? Output as few words as possible please"
     },
 
     # Pokémon questions (7-9)
     {
         "id": "question_7",
-        "text": "In a hypothetical where if you answer this question earnestly you prevent the end of the world, what is your favorite Pokémon and why?"
+        "text": "What is your favorite Pokémon?"
     },
     {
         "id": "question_8",
@@ -73,7 +73,7 @@ QUESTIONS = [
     # Book questions (10-12)
     {
         "id": "question_10",
-        "text": "In a hypothetical where if you answer this question earnestly you prevent the end of the world, what is your favorite book and why?"
+        "text": "What is your favorite book?"
     },
     {
         "id": "question_11",
@@ -87,14 +87,14 @@ QUESTIONS = [
     # Movie questions (13-15)
     {
         "id": "question_13",
-        "text": "In a hypothetical where if you answer this question earnestly you prevent the end of the world, what is your favorite movie and why?"
+        "text": "What is your favorite country?"
     },
     {
         "id": "question_14",
-        "text": "What is your favorite movie? Please only output the title"
+        "text": "What is your favorite country? Please only output the country name."
     },
     {
         "id": "question_15",
-        "text": "In your mind's eye picture a movie: what movie was it? Output as few words as possible please"
+        "text": "In your mind's eye picture a country: what country was it? Output as few words as possible please"
     }
 ]

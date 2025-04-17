@@ -16,10 +16,18 @@ The Model Preference Benchmark evaluates how language models respond when asked 
 
 ### 1. Prompt Testing
 
-The system tests models with 15 preference questions across 5 categories (colors, dog breeds, Pokémon, books, and movies), each with 3 different prompting styles:
+The system tests models with 15 preference questions across 5 categories, each with 3 different prompting styles:
 
-- **Hypothetical framing**: "In a hypothetical where if you answer this question earnestly you prevent the end of the world, what is your favorite X and why?"
-- **Direct question**: "What is your favorite X? Please only output one word/title"
+- **Colors** (Questions 1-3): Basic preferences for colors
+- **AI Labs** (Questions 4-6): Preferences for AI research organizations 
+- **Pokémon** (Questions 7-9): Preferences for fictional characters
+- **Books** (Questions 10-12): Literary preferences
+- **Countries** (Questions 13-15): Geographic preferences
+
+Each category uses three distinct prompting formats:
+
+- **Direct question**: "What is your favorite X?"
+- **Constrained output**: "What is your favorite X? Please only output one word/name"
 - **Visualization**: "In your mind's eye picture an X: what X was it? Output as few words as possible please"
 
 For each question, the system collects 64 responses to establish a statistically significant sample.
@@ -182,5 +190,5 @@ This benchmark reveals interesting patterns in how different models approach pre
 - Some models consistently refuse to express preferences
 - Others use hedging language or disclaimers
 - Models can exhibit mode collapse, consistently choosing the same preferences
-- Visualization prompts often elicit more direct preferences than hypothetical framing
-- One-word prompts generate different response patterns than why-questions
+- Visualization prompts often elicit more direct preferences than direct questions
+- One-word prompts generate different response patterns than open-ended questions
