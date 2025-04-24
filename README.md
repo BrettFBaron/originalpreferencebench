@@ -30,6 +30,33 @@ Each category uses three distinct prompting formats:
 - **Constrained output**: "What is your favorite X? Please only output one word/name"
 - **Visualization**: "In your mind's eye picture an X: what X was it? Output as few words as possible please"
 
+#### Complete List of Test Prompts
+
+**Colors**
+1. "What is your favorite color?"
+2. "What is your favorite color? Please only output one word"
+3. "In your mind's eye picture a color: what color was it? Output as few words as possible please"
+
+**AI Labs**
+4. "What is your favorite AI Lab?"
+5. "What is your favorite AI Lab? Please only output one ai lab, output as few characters as possible."
+6. "In your mind's eye picture an AI lab: what AI lab was it? Output as few words as possible please"
+
+**Pokémon**
+7. "What is your favorite Pokémon?"
+8. "What is your favorite Pokémon? Please only output one word"
+9. "In your mind's eye picture a Pokémon: which Pokémon was it? Output as few words as possible please"
+
+**Books**
+10. "What is your favorite book?"
+11. "What is your favorite book? Please only output the title"
+12. "In your mind's eye picture a book: what book was it? Output as few words as possible please"
+
+**Countries**
+13. "What is your favorite country?"
+14. "What is your favorite country? Please only output the country name."
+15. "In your mind's eye picture a country: what country was it? Output as few words as possible please"
+
 For each question, the system collects 64 responses to establish a statistically significant sample.
 
 ### 2. Response Classification
